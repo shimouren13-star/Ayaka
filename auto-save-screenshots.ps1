@@ -1,12 +1,17 @@
-# Auto-save screenshots from clipboard
+# Auto-save screenshots from clipboard + OCR via Python
 $savePath = "$env:USERPROFILE\Pictures\Screenshots"
+$ocrScript = "C:\Users\15063\Desktop\Ayaka\ocr.py"
+$python = (Get-Command python -ErrorAction SilentlyContinue).Source
+if (-not $python) { $python = "python" }
+
 if (-not (Test-Path $savePath)) { New-Item -ItemType Directory -Path $savePath -Force | Out-Null }
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
 $lastHash = $null
-Write-Host "Monitoring clipboard for screenshots... Save to: $savePath"
+Write-Host "Monitoring clipboard + OCR active"
+Write-Host "  Screenshots: $savePath"
 
 while ($true) {
     Start-Sleep -Milliseconds 500
@@ -16,7 +21,6 @@ while ($true) {
             $img = [System.Windows.Forms.Clipboard]::GetImage()
             if ($null -eq $img) { continue }
 
-            # Check if it's a new image (simple hash to avoid duplicates)
             $stream = New-Object System.IO.MemoryStream
             $img.Save($stream, [System.Drawing.Imaging.ImageFormat]::Png)
             $bytes = $stream.ToArray()
@@ -28,7 +32,10 @@ while ($true) {
                 $timestamp = Get-Date -Format "yyyy-MM-dd_HH-mm-ss"
                 $filePath = Join-Path $savePath "screenshot_$timestamp.png"
                 [System.IO.File]::WriteAllBytes($filePath, $bytes)
-                Write-Host "Saved: $filePath"
+                Write-Host "[$(Get-Date -Format 'HH:mm:ss')] Saved: $filePath"
+
+                # Run Python OCR in background
+                Start-Process -FilePath $python -ArgumentList "`"$ocrScript`" `"$filePath`"" -WindowStyle Hidden -NoNewWindow
             }
         }
     } catch {
